@@ -1,5 +1,5 @@
 [package]
-name = "actix-web-learn"
+name = "actix_web_learn"
 version = "0.1.0"
 edition = "2021"
 

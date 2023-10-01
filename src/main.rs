@@ -1,40 +1,17 @@
-use std::sync::{Arc, atomic::{AtomicUsize, Ordering}, Mutex};
-
-use actix_web::{get, HttpResponse, Responder, web, http::header::ContentType, middleware::Logger};
-
+use std::sync::{Arc, atomic::AtomicUsize, Mutex};
+use actix_web::{web, middleware::Logger};
 use serde::Serialize;
-
 use env_logger::Env;
 
-#[derive(Serialize)]
-struct HealthInfo {
-    app_name: String,
-    connections_number: usize,
-    total_request_recibed: usize,
-    is_alive: bool,
-}
+use app::system::system::config;
 
-struct AppState {
-    app_name: String,
-    connections: Arc<AtomicUsize>,
-    requests_recibed: Mutex<usize>,
-    alive: bool
-}
+mod app;
 
-#[get("/healthchecker")]
-async fn healthchecker(data: web::Data<AppState>) -> impl Responder {
-    let mut request_count = data.requests_recibed.lock().unwrap();
-    *request_count += 1;
-
-    let info = HealthInfo {
-        app_name: data.app_name.to_string(),
-        connections_number: data.connections.load(Ordering::Relaxed),
-        total_request_recibed: *request_count,
-        is_alive: data.alive
-    };
-    HttpResponse::Ok()
-    .content_type(ContentType::json())
-    .json(info)
+pub struct AppState {
+    pub app_name: String,
+    pub connections: Arc<AtomicUsize>,
+    pub requests_recibed: Mutex<usize>,
+    pub alive: bool
 }
 
 #[actix_web::main]
@@ -55,7 +32,7 @@ async fn main() -> std::io::Result<()> {
         //.wrap(Logger::default())
         .wrap(Logger::new("%a %t %r %s %b %{Referer}i %{User-Agent}i %D"))
         .app_data(data.clone())
-        .service(healthchecker)
+        .configure(config)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
