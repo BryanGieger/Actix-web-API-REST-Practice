@@ -1,11 +1,11 @@
 use std::sync::{Arc, atomic::AtomicUsize, Mutex};
 use actix_web::{web, middleware::Logger};
-use serde::Serialize;
 use env_logger::Env;
 
-use app::system::system::config;
-
 mod app;
+mod middleware;
+
+use app::system::services::config;
 
 pub struct AppState {
     pub app_name: String,
