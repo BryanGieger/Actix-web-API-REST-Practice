@@ -1,2 +1,4 @@
 /.vscode
 /target
+/.gitignore
+/src/main.txt
