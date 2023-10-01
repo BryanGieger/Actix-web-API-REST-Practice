@@ -1,0 +1,151 @@
+use std::sync::Mutex;
+
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+
+// Esta estructura representa el estado
+/*
+    El estado es refiere a los datos que se comprarten entre multiples
+    solicitudes o entre multiples instancias de la app, este puede ser mutable
+    o inmutable, este estado tambien es accesible en Middleware.
+*/
+/*struct AppState {
+    app_name: String,
+}*/
+//Estructura que representa un estado compartido mutable
+struct AppStateWithCounter {
+    counter: Mutex<i32>, // <- Mutex es necesario para modificar de manera segura
+}
+
+//Ejemplo de una peticion GET a la raiz que devuelve un texto
+/*#[get("/")]
+async fn hello() -> impl Responder {
+    //Retorna implicitamente esto:
+    HttpResponse::Ok().body("Holis uwur")
+}*/
+// Esto va junto al estado
+/*#[get("/")]
+async fn index(data: web::Data<AppState>) -> String {
+    let app_name = &data.app_name;
+    format!("Holis {app_name}")
+}*/
+// Esto va junto al estado compartido mutable
+#[get("/")]
+async fn index(data: web::Data<AppStateWithCounter>) -> String {
+    let mut counter = data.counter.lock().unwrap(); 
+    *counter += 1;
+
+    //Retorna implicitamente
+    format!("Request number: {counter}")
+}
+
+//Ejemplo de una peticion POST que recupera el dato enviado por el cliente y lo devuelve.
+#[post("/echo")]
+async fn echo(req_body: String) -> impl Responder {
+    //Retorna implicitamente esto:
+    HttpResponse::Ok().body(req_body)
+}
+
+//Ejemplo de una peticion GET que se configura manualmente y sin el uso de las macros.
+async fn manual_hello() -> impl Responder {
+    //Retorna implicitamente esto:
+    HttpResponse::Ok().body("UwUr manuelita bb")
+}
+
+// Ejemplos de configuracion en modulos diferentes
+// Esta funcion se encuentra en un modulo diferente:
+fn scoped_config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::resource("/test")
+        .route(web::get().to(|| async { HttpResponse::Ok().body("test") }))
+        .route(web::head().to(HttpResponse::MethodNotAllowed)),
+    );
+}
+
+// Esta funcion se encuentra en un modulo diferente:
+fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::resource("/app")
+        .route(web::get().to(|| async { HttpResponse::Ok().body("app") }))
+        .route(web::head().to(HttpResponse::MethodNotAllowed)),
+    );
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    //Ejemplo de como insertar configuraciones de otros modulos
+    HttpServer::new(|| {
+        App::new()
+        .configure(config)
+        .service(web::scope("/api").configure(scoped_config))
+        .route("/", web::get().to(|| async { HttpResponse::Ok().body("/") }))
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
+
+    //Ejemplo de como inicializar y pasar el estado a la APP
+    // Estado normal
+    /*HttpServer::new(|| {
+        App::new()
+        .app_data(web::Data::new(AppState {
+            app_name: String::from("Actix Web"),
+        }))
+        .service(index)
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await*/
+    // Estado compartido mutable
+    /* Nota: a diferencia del normal, aqui creamos web::Data FUERA del ambito de HttpServer::new
+       Esto se hace asi ya que si se hace dentro puede desincronizarse cuando se modifica.
+       Entonces para lograr que sea compartido globalmente debe crearse fuera y luego movido/clonado
+       en HttpServer::new
+    */
+    /*let counter = web::Data::new(AppStateWithCounter {
+        counter: Mutex::new(0),
+    });
+
+    HttpServer::new(move || {
+        // Aqui usamos move para mover counter al ambito de HttpServer::new
+        App::new()
+        .app_data(counter.clone()) // Aqui registramos la data creada
+        .service(index)
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await*/
+
+
+    //Especificando rutas para un ambito especifico, utilizando un prefijo
+    /*HttpServer::new(|| {
+        App::new()
+        .service(
+            web::scope("/app")
+            .service(hello)
+            .service(echo)
+            .route("/hey", web::get().to(manual_hello))
+        )
+        .service(
+            web::scope("/test/app")
+            .service(hello)
+            .service(echo)
+            .route("/hey", web::get().to(manual_hello))
+        )
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await*/
+    
+    
+    //Inicio normal
+    // HttpServer acepta como parametro una fabrica de aplicaciones y estas tienen limites Send+Sync
+    /*HttpServer::new(|| {
+        App::new()
+        .service(hello)
+        .service(echo)
+        .route("/hey", web::get().to(manual_hello))
+    })
+    .bind(("127.0.0.1", 8080))? // Para iniciar el servidor web primero debe estar enlazado a un socket de red, si este esta siendo usado por otra aplicacion fallara.
+    .run() // Esto inicia el procesamiento de solicitudes
+    .await*/ // Debe ser del tipo awaited o spawned que ejecutara esto hasta que reciba una señal de apagado como ctrl+c
+}
