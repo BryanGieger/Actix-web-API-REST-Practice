@@ -1,5 +1,6 @@
 use actix_web::{HttpResponseBuilder, HttpResponse};
 use actix_web::{get, web};
+use mongodb::Client;
 use serde_json::json;
 use std::borrow::BorrowMut;
 use std::sync::atomic::Ordering;
@@ -7,16 +8,17 @@ use std::sync::atomic::Ordering;
 use crate::models::*;
 use crate::controllers::*;
 use crate::db::*;
+use crate::AppState;
 //-- APP -------------------------------------------
 
 // Sistema -----------------------------------------
 
 //Toma la informacion del estado, revisa el estado de la base de datos y da un response JSON
 #[get("/estado")]
-async fn state(data: web::Data<AppState>) -> HttpResponse {
+async fn state(data: web::Data<AppState>, mongodbcli: web::Data<mongodb::Client>) -> HttpResponse {
     update_state_number(data.n_requests_recibed.lock().unwrap().borrow_mut());//<- Añade +1 al numero de peticiones
     
-    let status_result = mongodb_status(data.mongodb_client.clone()).await;
+    let status_result = mongodb_status(mongodbcli.as_ref().clone()).await;
 
     match status_result {
         Ok(status) => {
@@ -66,7 +68,6 @@ pub fn config_tests(cfg: &mut web::ServiceConfig) {
         web::resource("/app/test") // <- Genera un prefijo en la ruta: app/test/{route_path}
         
         // Se agregan todas las rutas una por una
+        
     );
 }
-
-

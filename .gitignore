@@ -2,3 +2,5 @@
 /target
 /src/main.txt
 /.env
+/config/jwt-decoding.bin
+/config/jwt-encoding.bin

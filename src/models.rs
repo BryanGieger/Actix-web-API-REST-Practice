@@ -1,18 +1,4 @@
-use std::sync::{Arc, atomic::AtomicUsize, Mutex};
-use serde::Serialize;
-use mongodb::Client;
-
-// ESTADO --------------------------------------------------
-// Estructura que manejara la informacion del estado de la aplicación
-pub struct AppState {
-    pub app_name: String,
-    pub app_desc: String,
-    pub n_connections: Arc<AtomicUsize>,
-    pub n_connections_errors: Arc<AtomicUsize>,
-    pub n_requests_recibed: Mutex<usize>,
-    pub n_requests_errrors: Mutex<usize>,
-    pub mongodb_client: Client,
-}
+use serde::{Serialize, Deserialize};
 
 // Health Info --------------------------------------------------
 // Serializa la informacion proporcionada por el estado de la App
@@ -26,3 +12,28 @@ pub struct StatusInfo {
     pub numero_peticiones_con_errores: usize,
     pub db_estado: String
 }
+
+// Auth ---------------------------------------------------------
+
+//Estructura de los datos de la sesion
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct SessionData {
+    id: uuid::Uuid,
+    subject: String,
+}
+
+//Maneja los datos entrantes de la peticion de registro de un usuario
+#[derive(Deserialize)]
+struct SignUpPayload {
+    login: String,
+    password: String,
+    password_confirmation: String,
+}
+
+//Maneja los datos entrantes de la peticion de inicio de sesion de un usuario
+#[derive(Deserialize)]
+struct SignInPayload {
+    login: String,
+    password: String,
+}
+
