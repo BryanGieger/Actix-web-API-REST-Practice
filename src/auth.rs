@@ -21,7 +21,7 @@ pub struct AppClaims {
     #[serde(rename = "jti")]
     pub jwt_id: uuid::Uuid,
     #[serde(rename = "aci")]
-    pub account_id: i32,
+    pub account_id: uuid::Uuid,
     #[serde(rename = "nbf")]
     pub not_before: u64,
 }
@@ -37,13 +37,21 @@ impl actix_jwt_session::Claims for AppClaims {
 }
 
 impl AppClaims {
-    pub fn account_id(&self) -> i32 {
+    pub fn account_id(&self) -> uuid::Uuid {
         self.account_id
     }
 }
 
-struct AccountModel {
-    id: i32,
-    login: String,
-    pass_hash: String,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountModel {
+    pub uuid: uuid::Uuid,
+    pub user: String,
+    pub pass_hash: String,
+    pub role: RoleTypes,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RoleTypes {
+    Admin,
+    User
 }

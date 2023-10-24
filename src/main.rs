@@ -1,8 +1,14 @@
 use std::sync::{Arc, atomic::AtomicUsize, Mutex};
-use actix_web::{web::Data, middleware::Logger};
+use actix_web::{web::Data, middleware::Logger, rt::task};
 use env_logger::Env;
 use dotenv;
-use actix_jwt_session::*;
+use mongodb::sync::{
+    Client as SyncClient,
+};
+
+use mongodb::{
+    Client as AsyncClient,
+};
 
 mod models;
 mod routes;
@@ -10,10 +16,12 @@ mod controllers;
 mod middleware;
 mod auth;
 mod db;
+mod error;
 
-use db::{init_mongodbcli, redis_conn};
-use auth::AppClaims;
-use routes::{config, config_tests};
+use db::{init_async_mongodbcli, init_sync_mongodbcli, redis_conn};
+use middleware::prepare_jwt;
+//use routes::{config, config_tests};
+use routes::config;
 
 //Estructura que manejara la informacion del estado de la aplicación
 pub struct AppState {
@@ -48,31 +56,36 @@ async fn main() -> std::io::Result<()> {
     //Prepara los clientes de las bases de datos
     // - Redis
     let redis_pool = redis_conn().await;
-    // - MongoDB
-    let mongodbcli: mongodb::Client = init_mongodbcli().await;
+    // - MongoDB Sync
+    let uri = dotenv::var("MONGO_DB").unwrap();
+    let sync_mongodbcli:SyncClient = task::spawn_blocking(|| {
+        //SyncClient::with_uri_str(uri).unwrap()
+        init_sync_mongodbcli()
+    }).await.unwrap();
+    // - MongoDB Async
+    let async_mongodbcli: AsyncClient = init_async_mongodbcli().await;
 
-    //Prepara los JSON WEB TOKENS
-    let keys = JwtSigningKeys::load_or_create();
-    let (storage, factory) = SessionMiddlewareFactory::<AppClaims>::build(
-        Arc::new(keys.encoding_key), 
-        Arc::new(keys.decoding_key), 
-        Algorithm::HS256
-    )
-    .with_redis_pool(redis_pool.clone())
-    .with_jwt_header(JWT_HEADER_NAME)
-    .with_jwt_cookie(JWT_COOKIE_NAME)
-    .finish();
+    //Prepara el middleware de los JSON WEB TOKENS
+    let (storage, 
+        factory, 
+        jwt_ttl, 
+        refresh_ttl) = prepare_jwt(redis_pool.clone());
 
-    let jwt_ttl = JwtTtl(Duration::days(14));
-    let refresh_ttl = RefreshTtl(Duration::days(3*31));
+    /*std::env::set_var("RUST_LOG", "info");
+    std::env::set_var("RUST_BACKTRACE", "1");
+    env_logger::init();*/
 
     log::info!("Servidor iniciado en http://localhost:9090/ 🚀");
 
     HttpServer::new(move || {
+        //let logger = Logger::default();
+
         App::new()
         .wrap(Logger::new("%a %t %r %s %b %{Referer}i %{User-Agent}i %D"))
+        //.wrap(logger)
         .app_data(Data::new(AppState::new()))
-        .app_data(Data::new(mongodbcli.clone()))
+        .app_data(Data::new(async_mongodbcli.clone()))
+        .app_data(Data::new(sync_mongodbcli.clone()))
         .app_data(Data::new(storage.clone()))
         .app_data(Data::new(jwt_ttl))
         .app_data(Data::new(refresh_ttl))
